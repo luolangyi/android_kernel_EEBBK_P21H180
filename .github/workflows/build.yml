@@ -30,9 +30,10 @@ jobs:
           make "${A[@]}" -s kernelrelease
       - name: pack modules
         run: |
-          cd out
-          find . -name '*.ko' -exec cp --parents {} ../modules_pack/ \;
-          cd .. && tar czf modules.tar.gz -C modules_pack . && ls -la modules.tar.gz
+          mkdir -p modules_pack
+          ( cd out && find . -name '*.ko' -exec cp --parents {} ../modules_pack/ \; )
+          tar czf modules.tar.gz -C modules_pack .
+          ls -la modules.tar.gz
       - uses: actions/upload-artifact@v4
         with:
           name: eebbk-out2
