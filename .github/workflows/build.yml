@@ -1,0 +1,37 @@
+name: build-eebbk
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 1 }
+      - name: deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison cpio device-tree-compiler flex libssl-dev libncurses-dev lld gcc-aarch64-linux-gnu zip
+      - name: clang
+        run: |
+          set -e
+          R="$RUNNER_TEMP/clang-repo"
+          git clone --depth=1 --filter=blob:none --sparse --branch android12-release \
+            https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 "$R"
+          git -C "$R" sparse-checkout set clang-r383902
+          echo "CLANG_DIR=$R/clang-r383902/bin" >> "$GITHUB_ENV"
+          "$R/clang-r383902/bin/clang" --version | head -1
+      - name: build
+        run: |
+          set -e
+          export PATH="$CLANG_DIR:$PATH"
+          A=(O=out ARCH=arm64 CC=clang LD=ld.lld CROSS_COMPILE=aarch64-linux-gnu- CLANG_TRIPLE=aarch64-linux-gnu- LOCALVERSION=-eebbk KBUILD_BUILD_USER=luolangyi KBUILD_BUILD_HOST=pc)
+          make "${A[@]}" ums512-p21h180_defconfig
+          make -j"$(nproc)" "${A[@]}" Image dtbs
+          ls -la out/arch/arm64/boot/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eebbk-out
+          path: |
+            out/arch/arm64/boot/Image
+            out/arch/arm64/boot/dts/sprd/*.dtb
+            out/arch/arm64/boot/dts/sprd/*.dtbo
