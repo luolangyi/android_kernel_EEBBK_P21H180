@@ -19,19 +19,25 @@ jobs:
             https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 "$R"
           git -C "$R" sparse-checkout set clang-r383902
           echo "CLANG_DIR=$R/clang-r383902/bin" >> "$GITHUB_ENV"
-          "$R/clang-r383902/bin/clang" --version | head -1
       - name: build
         run: |
           set -e
           export PATH="$CLANG_DIR:$PATH"
           A=(O=out ARCH=arm64 CC=clang LD=ld.lld CROSS_COMPILE=aarch64-linux-gnu- CLANG_TRIPLE=aarch64-linux-gnu- LOCALVERSION=-eebbk KBUILD_BUILD_USER=luolangyi KBUILD_BUILD_HOST=pc)
           make "${A[@]}" ums512-p21h180_defconfig
-          make -j"$(nproc)" "${A[@]}" Image dtbs
-          ls -la out/arch/arm64/boot/
+          make -j"$(nproc)" "${A[@]}" Image dtbs modules
+          find out -name '*.ko' | wc -l
+          make "${A[@]}" -s kernelrelease
+      - name: pack modules
+        run: |
+          cd out
+          find . -name '*.ko' -exec cp --parents {} ../modules_pack/ \;
+          cd .. && tar czf modules.tar.gz -C modules_pack . && ls -la modules.tar.gz
       - uses: actions/upload-artifact@v4
         with:
-          name: eebbk-out
+          name: eebbk-out2
           path: |
             out/arch/arm64/boot/Image
             out/arch/arm64/boot/dts/sprd/*.dtb
             out/arch/arm64/boot/dts/sprd/*.dtbo
+            modules.tar.gz
